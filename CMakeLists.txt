@@ -62,9 +62,4 @@ else()
   )
 endif()
 
-# 4. Link the webview library
-# On macOS, this automatically links WebKit and Cocoa frameworks.
 target_link_libraries(app PRIVATE Qt6::Widgets Qt6::Sql nlohmann_json::nlohmann_json)
-
-# 5. (Optional) Copy html files to build folder so the app can find them
-file(COPY ${CMAKE_SOURCE_DIR}/ui/index.html DESTINATION ${CMAKE_BINARY_DIR})
