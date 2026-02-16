@@ -1,6 +1,0 @@
-<RCC>
-  <qresource prefix="/">
-    <file>migrations/001_init.sql</file>
-    <file>migrations/002_indexes.sql</file>
-  </qresource>
-</RCC>
