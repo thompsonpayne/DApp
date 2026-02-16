@@ -2,6 +2,12 @@
 
 This is a learning project for practicing C++ desktop application development.
 
+## Prerequisites
+
+- C++23 compiler (Clang or GCC)
+- CMake 3.16+
+- Qt 6 with Widgets and Sql modules
+
 ## Tech stack
 
 - C++23
