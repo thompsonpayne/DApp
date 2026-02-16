@@ -1,0 +1,7 @@
+/Users/duongnguyen/study/c/logistics-app/build/CMakeFiles/app.dir
+/Users/duongnguyen/study/c/logistics-app/build/CMakeFiles/edit_cache.dir
+/Users/duongnguyen/study/c/logistics-app/build/CMakeFiles/rebuild_cache.dir
+/Users/duongnguyen/study/c/logistics-app/build/CMakeFiles/app_autogen_timestamp_deps.dir
+/Users/duongnguyen/study/c/logistics-app/build/CMakeFiles/app_autogen.dir
+/Users/duongnguyen/study/c/logistics-app/build/_deps/json-build/CMakeFiles/edit_cache.dir
+/Users/duongnguyen/study/c/logistics-app/build/_deps/json-build/CMakeFiles/rebuild_cache.dir

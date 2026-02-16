@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Logistics Manager</title>
+    <style>
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        margin: 0;
+        padding: 24px;
+        background: #f7f7f3;
+        color: #222;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      label {
+        display: block;
+        margin: 16px 0 8px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 12px;
+        padding: 10px 14px;
+        font-size: 16px;
+        border: 1px solid #555;
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      pre {
+        margin-top: 16px;
+        padding: 12px;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        min-height: 80px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Logistics Manager</h1>
+      <p>Type a message and send it to C++.</p>
+
+      <form>
+        <label for="message">Message</label>
+        <input
+          autofocus
+          id="message"
+          type="text"
+          placeholder="Hello from the UI"
+        />
+
+        <button id="sendBtn" type="button">Send to C++</button>
+
+        <pre id="log">Log:</pre>
+      </form>
+    </main>
+
+    <script>
+      const input = document.getElementById("message");
+      const button = document.getElementById("sendBtn");
+      const log = document.getElementById("log");
+
+      function appendLog(line) {
+        log.textContent += "\n" + line;
+      }
+
+      button.addEventListener("click", () => {
+        const text = input.value.trim();
+        if (!text) {
+          appendLog("Please enter a message.");
+          return;
+        }
+
+        if (typeof window.logisticsLog === "function") {
+          const result = window.logisticsLog(text);
+          appendLog("Sent: " + text);
+          if (result !== undefined && result !== null && result !== "") {
+            appendLog("C++ returned: " + result);
+          }
+        } else {
+          appendLog("logisticsLog is not available.");
+        }
+      });
+    </script>
+  </body>
+</html>
