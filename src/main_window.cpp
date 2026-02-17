@@ -1,16 +1,35 @@
 #include "main_window.h"
-
-#include <QDialog>
-#include <QMessageBox>
-#include <optional>
-
+#include "QSplitter"
 #include "home_screen.h"
 #include "order_form_dialog.h"
+#include <QDialog>
+#include <QMessageBox>
+#include <QVBoxLayout>
+#include <optional>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   setWindowTitle("LogisticsApp");
 
-  stack = new QStackedWidget(this);
+  auto *root = new QSplitter(Qt::Horizontal, this);
+
+  // Sidebar (left)
+  auto *sidebar = new QWidget(root);
+  sidebar->setObjectName("sidebar");
+  sidebar->setMinimumWidth(180);
+  auto *sidebarLayout = new QVBoxLayout(sidebar);
+  sidebarLayout->setContentsMargins(12, 12, 12, 12);
+  sidebarLayout->setSpacing(8);
+
+  auto *ordersBtn = new QPushButton("Order", sidebar);
+  auto *backBtn = new QPushButton("Back", sidebar);
+  backBtn->setEnabled(false);
+
+  sidebarLayout->addWidget(ordersBtn);
+  sidebarLayout->addStretch(1);
+  sidebarLayout->addWidget(backBtn);
+
+  // Main content (right)
+  stack = new QStackedWidget(root);
   home = new HomeScreen(stack);
   detail = new DetailScreen(stack);
   ordersModel = nullptr;
@@ -18,10 +37,30 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   stack->addWidget(home);
   stack->addWidget(detail);
   stack->setCurrentWidget(home);
-  setCentralWidget(stack);
 
+  root->addWidget(sidebar);
+  root->addWidget(stack);
+  root->setStretchFactor(0, 0);
+  root->setStretchFactor(1, 1);
+  root->setSizes({220, 580});
+  setCentralWidget(root);
+
+  // Sidebar actions
+  connect(ordersBtn, &QPushButton::clicked, this, [this] {
+    history.clear();
+    stack->setCurrentWidget(home);
+  });
+
+  connect(backBtn, &QPushButton::clicked, this, [this] { back(); });
+
+  // Sync Back button enable state
+  connect(stack, &QStackedWidget::currentChanged, this,
+          [this, backBtn] { backBtn->setEnabled(!history.empty()); });
+
+  // Home button events
   connect(home, &HomeScreen::createOrderRequested, this,
           [this] { handleCreateOrder(); });
+
   connect(home, &HomeScreen::deleteOrderRequested, this,
           [this](long long orderId) { handleDeleteOrder(orderId); });
 
