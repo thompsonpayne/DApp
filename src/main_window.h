@@ -9,6 +9,8 @@
 #include "detail_screen.h"
 #include "home_screen.h"
 
+class QSplitter;
+
 class MainWindow final : public QMainWindow {
 public:
   explicit MainWindow(QWidget *parent = nullptr);
@@ -16,6 +18,8 @@ public:
 private:
   Database db;
   QSqlTableModel *ordersModel;
+  QSplitter *rootSplitter;
+  int sidebarLastWidth;
   QStackedWidget *stack;
   HomeScreen *home;
   DetailScreen *detail;
