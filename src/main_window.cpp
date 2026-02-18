@@ -65,6 +65,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   sidebarLayout->addWidget(toggleBtn);
   sidebarLayout->addWidget(ordersBtn);
   sidebarLayout->addStretch(1);
+  sidebar->setVisible(false);
   // sidebarLayout->addWidget(backBtn);
 
   if (!db.open() || !db.migrate()) {
@@ -85,10 +86,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   stack->addWidget(detail);
   stack->setCurrentWidget(login);
 
-  connect(login, &LoginScreen::authenticated, this, [this, ordersBtn] {
+  connect(login, &LoginScreen::authenticated, this, [this, ordersBtn, sidebar] {
     isAuthenticated = true;
     ordersBtn->setEnabled(true);
     history.clear();
+    sidebar->setVisible(true);
     stack->setCurrentWidget(home);
   });
 
