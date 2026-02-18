@@ -37,6 +37,8 @@ if (COMMAND qt_add_executable)
     src/home_screen.h
     src/detail_screen.cpp
     src/detail_screen.h
+    src/login_screen.h
+    src/login_screen.cpp
     src/order_form_dialog.cpp
     src/order_form_dialog.h
     src/database.cpp
@@ -53,6 +55,8 @@ else()
     src/home_screen.h
     src/detail_screen.cpp
     src/detail_screen.h
+    src/login_screen.h
+    src/login_screen.cpp
     src/order_form_dialog.cpp
     src/order_form_dialog.h
     src/database.cpp

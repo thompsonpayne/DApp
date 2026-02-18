@@ -5,14 +5,15 @@
 #include <QSize>
 #include <QSizePolicy>
 #include <QSplitter>
+#include <QStyle>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
-#include <QStyle>
 #include <optional>
 #include <vector>
 
+#include "login_screen.h"
 #include "order_form_dialog.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
@@ -22,7 +23,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   sidebarLastWidth = 220;
   rootSplitter = new QSplitter(Qt::Horizontal, this);
 
-  // Sidebar (left)
+  // NOTE: Sidebar (left)
   auto *sidebar = new QWidget(rootSplitter);
   sidebar->setObjectName("sidebar");
   sidebar->setMinimumWidth(kSidebarCollapsedWidth);
@@ -34,8 +35,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   const QIcon expandIcon = style()->standardIcon(QStyle::SP_ArrowRight);
 
   auto initMenuButton = [this](QToolButton *button, const QString &label,
-                              QStyle::StandardPixmap standardIcon,
-                              bool defaultEnabled) {
+                               QStyle::StandardPixmap standardIcon,
+                               bool defaultEnabled) {
     button->setText(label);
     button->setIcon(style()->standardIcon(standardIcon));
     button->setAutoRaise(true);
@@ -55,26 +56,49 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   toggleBtn->setToolTip("Collapse sidebar");
 
   auto *ordersBtn = new QToolButton(sidebar);
-  initMenuButton(ordersBtn, "Orders", QStyle::SP_FileDialogListView, true);
-  auto *backBtn = new QToolButton(sidebar);
-  initMenuButton(backBtn, "Back", QStyle::SP_ArrowBack, false);
+  initMenuButton(ordersBtn, "Orders", QStyle::SP_FileDialogListView, false);
+  // auto *backBtn = new QToolButton(sidebar);
+  // initMenuButton(backBtn, "Back", QStyle::SP_ArrowBack, false);
 
-  const std::vector<QToolButton *> menuButtons = {ordersBtn, backBtn};
+  const std::vector<QToolButton *> menuButtons = {ordersBtn};
 
   sidebarLayout->addWidget(toggleBtn);
   sidebarLayout->addWidget(ordersBtn);
   sidebarLayout->addStretch(1);
-  sidebarLayout->addWidget(backBtn);
+  // sidebarLayout->addWidget(backBtn);
 
-  // Main content (right)
+  if (!db.open() || !db.migrate()) {
+    QMessageBox::critical(this, "Database error", db.lastError());
+    setEnabled(false);
+    return;
+  }
+
+  // NOTE: Main content (right)
   stack = new QStackedWidget(rootSplitter);
+  login = new LoginScreen(&db, stack);
   home = new HomeScreen(stack);
   detail = new DetailScreen(stack);
   ordersModel = nullptr;
 
+  stack->addWidget(login);
   stack->addWidget(home);
   stack->addWidget(detail);
-  stack->setCurrentWidget(home);
+  stack->setCurrentWidget(login);
+
+  connect(login, &LoginScreen::authenticated, this, [this, ordersBtn] {
+    isAuthenticated = true;
+    ordersBtn->setEnabled(true);
+    history.clear();
+    stack->setCurrentWidget(home);
+  });
+
+  connect(ordersBtn, &QToolButton::clicked, this, [this] {
+    if (!isAuthenticated) {
+      return;
+    }
+    history.clear();
+    stack->setCurrentWidget(home);
+  });
 
   rootSplitter->addWidget(sidebar);
   rootSplitter->addWidget(stack);
@@ -84,72 +108,72 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
   rootSplitter->setHandleWidth(0);
   setCentralWidget(rootSplitter);
 
-  auto applySidebarExpanded =
-      [this, sidebar, toggleBtn, menuButtons, collapseIcon, expandIcon,
-       kSidebarCollapsedWidth](bool expanded) {
-        if (!rootSplitter) {
-          return;
-        }
+  auto applySidebarExpanded = [this, sidebar, toggleBtn, menuButtons,
+                               collapseIcon, expandIcon,
+                               kSidebarCollapsedWidth](bool expanded) {
+    if (!rootSplitter) {
+      return;
+    }
 
-        const auto sizes = rootSplitter->sizes();
-        int total = sizes.value(0) + sizes.value(1);
-        if (total <= 0) {
-          total = rootSplitter->width();
-        }
+    const auto sizes = rootSplitter->sizes();
+    int total = sizes.value(0) + sizes.value(1);
+    if (total <= 0) {
+      total = rootSplitter->width();
+    }
 
-        if (expanded) {
-          sidebar->setMaximumWidth(QWIDGETSIZE_MAX);
+    if (expanded) {
+      sidebar->setMaximumWidth(QWIDGETSIZE_MAX);
 
-          toggleBtn->setIcon(collapseIcon);
-          toggleBtn->setText("Collapse");
-          toggleBtn->setToolTip("Collapse sidebar");
-          toggleBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+      toggleBtn->setIcon(collapseIcon);
+      toggleBtn->setText("Collapse");
+      toggleBtn->setToolTip("Collapse sidebar");
+      toggleBtn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 
-          for (auto *btn : menuButtons) {
-            btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-          }
+      for (auto *btn : menuButtons) {
+        btn->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+      }
 
-          if (total <= 0) {
-            return;
-          }
+      if (total <= 0) {
+        return;
+      }
 
-          const int desired = sidebarLastWidth > kSidebarCollapsedWidth
-                                  ? sidebarLastWidth
-                                  : 220;
-          constexpr int kMinContentWidth = 240;
-          const int maxSidebar =
-              qMax(kSidebarCollapsedWidth, total - kMinContentWidth);
-          const int w = qBound(kSidebarCollapsedWidth, desired, maxSidebar);
-          rootSplitter->setSizes({w, qMax(0, total - w)});
-        } else {
-          const int currentW = sizes.value(0);
-          if (currentW > kSidebarCollapsedWidth) {
-            sidebarLastWidth = currentW;
-          }
+      const int desired =
+          sidebarLastWidth > kSidebarCollapsedWidth ? sidebarLastWidth : 220;
+      constexpr int kMinContentWidth = 240;
+      const int maxSidebar =
+          qMax(kSidebarCollapsedWidth, total - kMinContentWidth);
+      const int w = qBound(kSidebarCollapsedWidth, desired, maxSidebar);
+      rootSplitter->setSizes({w, qMax(0, total - w)});
+    } else {
+      const int currentW = sizes.value(0);
+      if (currentW > kSidebarCollapsedWidth) {
+        sidebarLastWidth = currentW;
+      }
 
-          sidebar->setMaximumWidth(kSidebarCollapsedWidth);
+      sidebar->setMaximumWidth(kSidebarCollapsedWidth);
 
-          toggleBtn->setIcon(expandIcon);
-          toggleBtn->setText("Expand");
-          toggleBtn->setToolTip("Expand sidebar");
-          toggleBtn->setToolButtonStyle(Qt::ToolButtonIconOnly);
+      toggleBtn->setIcon(expandIcon);
+      toggleBtn->setText("Expand");
+      toggleBtn->setToolTip("Expand sidebar");
+      toggleBtn->setToolButtonStyle(Qt::ToolButtonIconOnly);
 
-          for (auto *btn : menuButtons) {
-            btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
-          }
+      for (auto *btn : menuButtons) {
+        btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
+      }
 
-          if (total <= 0) {
-            return;
-          }
+      if (total <= 0) {
+        return;
+      }
 
-          rootSplitter->setSizes(
-              {kSidebarCollapsedWidth,
-               qMax(0, total - kSidebarCollapsedWidth)});
-        }
-      };
+      rootSplitter->setSizes(
+          {kSidebarCollapsedWidth, qMax(0, total - kSidebarCollapsedWidth)});
+    }
+  };
 
   connect(toggleBtn, &QToolButton::toggled, this,
-          [applySidebarExpanded](bool expanded) { applySidebarExpanded(expanded); });
+          [applySidebarExpanded](bool expanded) {
+            applySidebarExpanded(expanded);
+          });
 
   // Ensure initial state styling is consistent after layout.
   QTimer::singleShot(0, this,
@@ -161,11 +185,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     stack->setCurrentWidget(home);
   });
 
-  connect(backBtn, &QToolButton::clicked, this, [this] { back(); });
+  // connect(backBtn, &QToolButton::clicked, this, [this] { back(); });
 
   // Sync Back button enable state
-  connect(stack, &QStackedWidget::currentChanged, this,
-          [this, backBtn] { backBtn->setEnabled(!history.empty()); });
+  // connect(stack, &QStackedWidget::currentChanged, this,
+  //         [this, backBtn] { backBtn->setEnabled(!history.empty()); });
 
   // Home button events
   connect(home, &HomeScreen::createOrderRequested, this,
@@ -180,12 +204,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
   connect(home, &HomeScreen::editOrderRequested, this,
           [this](long long orderId) { handleEditOrder(orderId); });
-
-  if (!db.open() || !db.migrate()) {
-    QMessageBox::critical(this, "Database error", db.lastError());
-    setEnabled(false);
-    return;
-  }
 
   ordersModel = new QSqlTableModel(this);
   ordersModel->setTable("orders");

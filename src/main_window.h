@@ -8,6 +8,7 @@
 #include "database.h"
 #include "detail_screen.h"
 #include "home_screen.h"
+#include "login_screen.h"
 
 class QSplitter;
 
@@ -21,8 +22,11 @@ private:
   QSplitter *rootSplitter;
   int sidebarLastWidth;
   QStackedWidget *stack;
+
   HomeScreen *home;
   DetailScreen *detail;
+  LoginScreen *login;
+
   std::vector<QWidget *> history;
 
   void goTo(QWidget *next);
@@ -31,4 +35,5 @@ private:
   void handleDeleteOrder(long long orderId);
   void handleOpenDetails(long long orderId);
   void handleEditOrder(long long orderId);
+  bool isAuthenticated = false;
 };

@@ -1,10 +1,12 @@
 #include "database.h"
 #include "models.h"
 
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRandomGenerator>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -86,7 +88,24 @@ bool applyMigration(const Migration &m, QString &err) {
 
   return true;
 }
+
+QString randomSaltHex(int bytes = 16) {
+  QByteArray buf;
+  buf.resize(bytes);
+  for (int i = 0; i < bytes; ++i) {
+    buf[i] = static_cast<char>(QRandomGenerator::global()->generate() & 0xFF);
+  }
+  return QString::fromLatin1(buf.toHex());
+}
+
+QString saltedSha256Hex(const QString &saltHex, const QString &password) {
+  const QByteArray input = (saltHex + ":" + password).toUtf8();
+  return QString::fromLatin1(
+      QCryptographicHash::hash(input, QCryptographicHash::Sha256).toHex());
+}
+
 } // namespace
+
 
 QString Database::dbPath() const {
   const auto baseDir =
@@ -135,6 +154,7 @@ bool Database::migrate() {
   const std::vector<Migration> migrations = {
       {1, ":/migrations/001_init.sql"},
       {2, ":/migrations/002_indexes.sql"},
+      {3, ":/migrations/003_users.sql"},
   };
 
   auto db = QSqlDatabase::database();
@@ -270,7 +290,7 @@ bool Database::deleteOrder(long long orderId) {
 };
 
 bool Database::updateOrder(long long orderId, const OrderDraft &o) {
-  lastError().clear();
+  lastErr.clear();
 
   QSqlQuery q;
   q.prepare(R"sql(
@@ -295,3 +315,86 @@ bool Database::updateOrder(long long orderId, const OrderDraft &o) {
   }
   return true;
 }
+
+std::optional<UserRow> Database::verifyUser(const QString &username,
+                                            const QString &password) {
+
+  lastErr.clear();
+
+  QSqlQuery q;
+  q.prepare(R"SQL(
+            select id, username, password_salt, password_hash, role
+            from users
+            where username = ?
+            limit 1
+            )SQL");
+  q.addBindValue(username.trimmed());
+
+  if (!q.exec()) {
+    lastErr = q.lastError().text();
+    return std::nullopt;
+  }
+  if (!q.next()) {
+    return std::nullopt;
+  }
+
+  const QString salt = q.value(2).toString();
+  const QString storeHash = q.value(3).toString();
+  const QString inputHash = saltedSha256Hex(salt, password);
+  if (storeHash != inputHash) {
+    return std::nullopt;
+  }
+
+  UserRow r;
+  r.id = q.value(0).toLongLong();
+  r.username = q.value(1).toString();
+  r.role = q.value(4).toString();
+  return r;
+};
+
+bool Database::hasAnyUsers() {
+  lastErr.clear();
+
+  QSqlQuery q;
+  if (!q.exec("select 1 from users limit 1")) {
+    lastErr = q.lastError().text();
+    return false;
+  }
+  return q.next();
+}
+
+std::optional<UserRow> Database::createUser(const QString &username,
+                                            const QString &password,
+                                            const QString &role) {
+  lastErr.clear();
+
+  const auto u = username.trimmed();
+  if (u.isEmpty()) {
+    lastErr = "Username is required";
+    return std::nullopt;
+  }
+
+  const QString salt = randomSaltHex();
+  const QString hash = saltedSha256Hex(salt, password);
+
+  QSqlQuery q;
+  q.prepare(R"SQL(
+            insert into users (username, password_salt, password_hash, role)
+            values (?, ?, ?, ?)
+            )SQL");
+  q.addBindValue(u);
+  q.addBindValue(salt);
+  q.addBindValue(hash);
+  q.addBindValue(role);
+
+  if (!q.exec()) {
+    lastErr = q.lastError().text();
+    return std::nullopt;
+  }
+
+  UserRow r;
+  r.id = q.lastInsertId().toLongLong();
+  r.username = u;
+  r.role = role;
+  return r;
+};
